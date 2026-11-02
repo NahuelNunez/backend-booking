@@ -22,10 +22,10 @@ export const insertStaff = async (
 
 export const assignStaffToLocation = async (
   client: PoolClient,
-  data: { staffId: string; locationId: string },
+  data: { tenantId: string; staffId: string; locationId: string },
 ): Promise<void> => {
-  await client.query(`INSERT INTO staff_location (staff_id, location_id) VALUES ($1, $2)`, [
-    data.staffId,
-    data.locationId,
-  ]);
+  await client.query(
+    `INSERT INTO staff_location (tenant_id, staff_id, location_id) VALUES ($1, $2, $3)`,
+    [data.tenantId, data.staffId, data.locationId],
+  );
 };

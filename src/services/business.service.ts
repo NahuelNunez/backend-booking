@@ -33,7 +33,11 @@ export const registerBusiness = async (
 
     // A staff_location row is what makes someone bookable at a branch.
     if (input.owner.takesAppointments) {
-      await assignStaffToLocation(client, { staffId: staff.id, locationId: location.id });
+      await assignStaffToLocation(client, {
+        tenantId: tenant.id,
+        staffId: staff.id,
+        locationId: location.id,
+      });
     }
 
     return { user, tenant, location, staff };

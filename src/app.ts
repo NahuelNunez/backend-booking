@@ -7,6 +7,10 @@ import { apiRouter } from "./routes/index.js";
 
 export const app = express();
 
+// Without the right hop count behind a proxy, every user shares the proxy's IP
+// and therefore one rate limit bucket.
+app.set("trust proxy", env.TRUST_PROXY);
+
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "100kb" }));

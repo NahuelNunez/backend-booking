@@ -7,6 +7,12 @@ const UNIQUE_VIOLATIONS: Record<string, { code: string; message: string }> = {
   tenant_slug_key: { code: "SLUG_TAKEN", message: "This business URL is already taken" },
 };
 
+// Client mistakes the body parser reports, which must not be logged as server failures.
+const HTTP_CLIENT_ERRORS: Record<number, { code: string; message: string }> = {
+  413: { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large" },
+  415: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Unsupported request encoding" },
+};
+
 interface PgError {
   code: string;
   constraint?: string;
@@ -14,6 +20,13 @@ interface PgError {
 
 const isPgError = (error: unknown): error is PgError =>
   typeof error === "object" && error !== null && "code" in error && typeof error.code === "string";
+
+const isHttpClientError = (error: unknown): error is Error & { status: number } =>
+  error instanceof Error &&
+  "status" in error &&
+  typeof error.status === "number" &&
+  error.status >= 400 &&
+  error.status < 500;
 
 const sendError = (res: Response, status: number, code: string, message: string, details?: unknown) => {
   res.status(status).json({
@@ -26,7 +39,13 @@ export const notFoundHandler = (_req: Request, res: Response) => {
   sendError(res, 404, "NOT_FOUND", "Route not found");
 };
 
-export const errorHandler = (error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+export const errorHandler = (error: unknown, _req: Request, res: Response, next: NextFunction) => {
+  // Once a response has started it can't be replaced; Express closes the connection.
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
   if (error instanceof AppError) {
     sendError(res, error.statusCode, error.code, error.message, error.details);
     return;
@@ -34,6 +53,16 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
 
   if (error instanceof SyntaxError && "body" in error) {
     sendError(res, 400, "INVALID_JSON", "Request body is not valid JSON");
+    return;
+  }
+
+  if (isHttpClientError(error)) {
+    const mapped = HTTP_CLIENT_ERRORS[error.status];
+    if (mapped) {
+      sendError(res, error.status, mapped.code, mapped.message);
+    } else {
+      sendError(res, 400, "BAD_REQUEST", "Bad request");
+    }
     return;
   }
 

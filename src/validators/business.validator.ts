@@ -1,10 +1,36 @@
 import { z } from "zod";
 
-const RESERVED_SLUGS = new Set(["www", "api", "admin", "app"]);
+// Tenants live at tuapp.com/<slug>, so these must stay free for the app's own routes.
+const RESERVED_SLUGS = new Set([
+  "www",
+  "api",
+  "admin",
+  "app",
+  "login",
+  "logout",
+  "register",
+  "signup",
+  "dashboard",
+  "assets",
+  "static",
+  "health",
+  "help",
+  "support",
+  "terms",
+  "privacy",
+  "pricing",
+  "settings",
+]);
 
 // DateTimeFormat accepts aliases (e.g. America/Argentina/Buenos_Aires) that
 // Intl.supportedValuesOf omits; Postgres accepts them too.
 const isValidTimezone = (timeZone: string): boolean => {
+  // DateTimeFormat also accepts offsets like +01:00, but Postgres reads those
+  // as POSIX zones with the sign flipped, which would shift the shop's hours.
+  if (/^[+-]/.test(timeZone)) {
+    return false;
+  }
+
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
     return true;
@@ -18,7 +44,8 @@ const optionalText = z.string().trim().max(200).optional();
 export const registerBusinessSchema = z.object({
   owner: z.object({
     fullName: z.string().trim().min(1, "Full name is required").max(100),
-    email: z.email("Enter a valid email").trim().toLowerCase(),
+    // Normalize first: z.email() checks the raw value, so it would reject stray spaces.
+    email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email")),
     password: z.string().min(8, "Password must be at least 8 characters").max(128),
     takesAppointments: z.boolean(),
   }),
@@ -38,7 +65,12 @@ export const registerBusinessSchema = z.object({
     currencyCode: z.enum(["USD", "ARS"]),
     addressLine1: optionalText,
     city: optionalText,
-    countryCode: z.string().trim().toUpperCase().length(2).optional(),
+    countryCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/, "Use a two-letter country code, e.g. AR")
+      .optional(),
     phoneE164: z
       .string()
       .trim()
