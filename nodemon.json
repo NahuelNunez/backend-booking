@@ -1,0 +1,6 @@
+{
+  "watch": ["src", ".env"],
+  "ignore": ["src/**/*.spec.ts"],
+  "ext": "ts,json",
+  "exec": "tsx --env-file-if-exists=.env src/server.ts"
+}
